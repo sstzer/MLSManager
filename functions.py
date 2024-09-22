@@ -1,7 +1,7 @@
-import json,requests
+import requests
 from config import record_path,mod_path,loader,version
-from mods import Version
-from utils import download_url,add_record,load_record,search,in_record,down_versions
+from mod import Version,Search,Record
+from utils import download_url,down_versions
 
 
 def search_project(num: int = 10) -> None:
@@ -9,7 +9,7 @@ def search_project(num: int = 10) -> None:
         a=input("输入模组名, 回车返回: ")
         if not a:
             return
-        mods=search(a,num)
+        mods=Search.search_list(a,num)
 
         if not mods:
             print("未找到匹配项")
@@ -30,18 +30,18 @@ def search_project(num: int = 10) -> None:
 
 
 def download_project(idx: str) -> None:
-    mods = load_record(record_path)
+    mods = Record.load(record_path)
     if any(t.project_id == idx for t in mods):
         print("已下载")
         return
     res: list[dict]=requests.get(f"https://api.modrinth.com/v2/project/{idx}/version").json()
     dow=[Version(t) for t in res if version in t["game_versions"] and loader in t["loaders"]]
     download_url(dow[0].file_name,dow[0].file_url)
-    add_record(record_path,dow[0].record(version,loader))
+    Record.add(record_path,dow[0].record(version,loader))
 
 
 def update() -> None:
-    recs=load_record(record_path)
+    recs=Record.load(record_path)
     if not mod_path.exists():
         mod_path.mkdir()
     files = [f.name for f in mod_path.iterdir()]
@@ -66,19 +66,19 @@ def update() -> None:
 
 
 def init_records() -> None:
-    recs=load_record(record_path)
+    recs=Record.load(record_path)
     record_path.write_text("[]")
     for file in mod_path.iterdir():
         print(f"正在处理{file.name}")
-        if in_record(file,recs):
+        if Record.isin(file,recs):
             print(f"已存在{file.name}")
             continue
-        res=search(file.name,1)
+        res=Search.search_list(file.name,1)
         if not res:
             print(f"!!!未找到{file}")
             continue
         if dow:=down_versions(res[0].project_id):
-            add_record(record_path,dow[0].record(version,loader))
+            Record.add(record_path,dow[0].record(version,loader))
         else:
             print(f"!!!错误的{file}")
     print("完成")
@@ -86,15 +86,15 @@ def init_records() -> None:
 
 def list_noRecord() -> None:
     clear()
-    recs=load_record(record_path)
+    recs=Record.load(record_path)
     if not mod_path.exists():
         mod_path.mkdir()
     for f in mod_path.iterdir():
-        if not in_record(f,recs):
+        if not Record.isin(f,recs):
             print(f.name)
 
 def clear() -> None:
-    recs=load_record(record_path)
+    recs=Record.load(record_path)
     for rec in recs:
         if not (mod_path/rec.file_name).exists():
             recs.remove(rec)
